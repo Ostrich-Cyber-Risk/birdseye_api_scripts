@@ -1,15 +1,17 @@
 import csv
 import requests
 import sys
-from typing import Final, TypedDict, List, NotRequired, Any, Optional
+from typing import Final, TypedDict, List, NotRequired, Any, Optional, Dict
 from functools import cache
 
 base_url: Final[str] = 'https://api.ostrichcyber-risk.com'
+
 
 class BusinessUnit(TypedDict):
     name: str
     businessUnitId: str
     businessUnits: NotRequired['BusinessUnit']
+    parent: NotRequired['BusinessUnit']
 
 
 class Assessment(TypedDict):
@@ -18,6 +20,7 @@ class Assessment(TypedDict):
     assessmentId: str
     assessmentName: str
     assessmentTypeId: str
+    businessUnit: 'BusinessUnit'
 
 
 class AssessmentScores(TypedDict):
@@ -66,6 +69,7 @@ def main():
     flat_business_units: List[BusinessUnit] = []
     for business_unit in business_units:
         flat_business_units.extend(flatten_business_unit(business_unit))
+    mapped_business_units: Dict[str, BusinessUnit] = {bu['businessUnitId']: bu for bu in flat_business_units}
 
     print('Retrieving Assessments...')
     flat_assessments: List[Assessment] = []
@@ -89,18 +93,29 @@ def main():
             continue
 
         try:
+            business_unit = mapped_business_units[assessment['businessUnitId']]
+            hierarchy = business_unit.get('name', 'N/A')
+            current_business_unit = business_unit
+            while current_business_unit.get('parent') is not None:
+                current_business_unit = current_business_unit.get('parent')
+                hierarchy = f'{current_business_unit.get('name', 'N/A')} > {hierarchy}'
+
+
             print(
-                f'BusinessUnit: {assessment['businessUnitName']} Assessment: {assessment['assessmentName']}, PercentDone: {summary.get('percentDone', 'N/A')}%, QuestionCount: {summary['questionCount']}')
+                f'Hierarchy: {hierarchy}, ParentBusinessUnit: {business_unit.get('parent', dict()).get('name', 'N/A')}, BusinessUnit: {assessment['businessUnitName']}, Assessment: {assessment['assessmentName']}, PercentDone: {summary.get('percentDone', 'N/A')}%, QuestionCount: {summary['questionCount']}')
             for sub in summary.get('subs', set()):
                 sub_info: SubInfo = get_sub_info(sub['subId'], token)
                 print(
                     f'\tSub: {sub_info['displayName']}, Email: {sub_info['email']}, PercentDone: {sub.get('percentDone', 'N/A')}%, Answered: {sub.get('answerCount', 'N/A')}/{sub['questionCount']}')
-                csv_rows.append({'BusinessUnit': assessment['businessUnitName'],
-                                 'Assessment': assessment['assessmentName'],
-                                 'Sub': sub_info['displayName'],
-                                 'Email': sub_info['email'],
-                                 'PercentDone': sub.get('percentDone', '(N/A)'),
-                                 'Answered': f'{sub.get('answerCount', '(N/A)')}/{sub['questionCount']}'})
+                csv_rows.append({
+                    'Hierarchy': hierarchy,
+                    'ParentBusinessUnit': business_unit.get('parent', dict()).get('name', 'N/A'),
+                    'BusinessUnit': assessment['businessUnitName'],
+                    'Assessment': assessment['assessmentName'],
+                    'Sub': sub_info['displayName'],
+                    'Email': sub_info['email'],
+                    'PercentDone': sub.get('percentDone', '(N/A)'),
+                    'Answered': f'{sub.get('answerCount', '(N/A)')}/{sub['questionCount']}'})
         except Exception as e:
             print(f'Error handling assessment {assessment.get('assessmentName', 'Unknown Assessment')}: {e}', file=sys.stderr)
 
@@ -183,7 +198,9 @@ def get_sub_info(sub_id: str, token: str) -> SubInfo:
 
 def flatten_business_unit(root_business_unit: BusinessUnit) -> List[BusinessUnit]:
     business_units: List[BusinessUnit] = [root_business_unit]
-    for child_business_unit in root_business_unit.get('businessUnits', set()):
+    children_business_units: List[BusinessUnit] = root_business_unit.get('businessUnits', list())
+    for child_business_unit in children_business_units:
+        child_business_unit['parent'] = root_business_unit
         business_units.extend(flatten_business_unit(child_business_unit))
 
     return business_units
