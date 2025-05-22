@@ -1,8 +1,7 @@
 import csv
-import sys
-from typing import Dict, List, Optional
-from exportAssessmentScores import flatten_business_units, get_all_assessments
 from ostrichApi import OstrichApi, Assessment, AssessmentScores, BusinessUnit, Score, SubInfo
+import sys
+from typing import List, Optional, Dict
 
 
 def main():
@@ -25,6 +24,7 @@ def main():
         except Exception as e:
             print(f'Failed to get scores for {assessment['assessmentName']}: {e}', file=sys.stderr)
             continue
+
         summary: Optional[Score] = extract_summary(assessment_scores)
         if summary is None:
             print(f'Summary Not Available for Assessment - BusinessUnit: {assessment['businessUnitName']} Assessment: {assessment['assessmentName']}', file=sys.stderr)
@@ -39,20 +39,33 @@ def main():
                 hierarchy = f'{current_business_unit.get('name', 'N/A')} > {hierarchy}'
 
             print(
-                f'Hierarchy: {hierarchy}, ParentBusinessUnit: {business_unit.get('parent', dict()).get('name', 'N/A')}, BusinessUnit: {assessment['businessUnitName']}, Assessment: {assessment['assessmentName']}, PercentDone: {summary.get('percentDone', 'N/A')}%, QuestionCount: {summary['questionCount']}')
-            for sub in summary.get('subs', set()):
-                sub_info: SubInfo = api_client.get_sub_info(sub['subId'])
-                print(
-                    f'\tSub: {sub_info['displayName']}, Email: {sub_info['email']}, PercentDone: {sub.get('percentDone', 'N/A')}%, Answered: {sub.get('answerCount', 'N/A')}/{sub['questionCount']}')
+                f'Hierarchy: {hierarchy}, ParentBusinessUnit: {business_unit.get('parent', dict()).get('name', 'N/A')}, BusinessUnit: {assessment['businessUnitName']}, Assessment: {assessment['assessmentName']}, PercentDone: {summary.get('percentDone', 'N/A')}%, QuestionCount: {summary.get('questionCount', 'N/A')}')
+            for score in assessment_scores.get('scores', set()):
                 csv_rows.append({
                     'Hierarchy': hierarchy,
                     'ParentBusinessUnit': business_unit.get('parent', dict()).get('name', 'N/A'),
                     'BusinessUnit': assessment['businessUnitName'],
                     'Assessment': assessment['assessmentName'],
-                    'Sub': sub_info['displayName'],
-                    'Email': sub_info['email'],
-                    'PercentDone': sub.get('percentDone', '(N/A)'),
-                    'Answered': f'{sub.get('answerCount', '(N/A)')}/{sub['questionCount']}'})
+                    'ItemId': score.get('itemId', 'N/A'),
+                    'Sub': '',
+                    'Email': '',
+                    'Score': score.get('score', '(N/A)'),
+                    'PercentDone': score.get('percentDone', '(N/A)'),
+                    'Answered': f'{score.get('answerCount', '(N/A)')}/{score.get('questionCount', '(N/A)')}'})
+                for sub in score.get('subs', set()):
+                    sub_info: SubInfo = api_client.get_sub_info(sub['subId'])
+                    csv_rows.append({
+                        'Hierarchy': hierarchy,
+                        'ParentBusinessUnit': business_unit.get('parent', dict()).get('name', 'N/A'),
+                        'BusinessUnit': assessment['businessUnitName'],
+                        'Assessment': assessment['assessmentName'],
+                        'ItemId': score.get('itemId', 'N/A'),
+                        'Sub': sub_info['displayName'],
+                        'Email': sub_info['email'],
+                        'Score': sub.get('score', '(N/A)'),
+                        'PercentDone': sub.get('percentDone', '(N/A)'),
+                        'Answered': f'{sub.get('answerCount', '(N/A)')}/{sub.get('questionCount', '(N/A)')}'})
+
         except Exception as e:
             print(f'Error handling assessment {assessment.get('assessmentName', 'Unknown Assessment')}: {e}', file=sys.stderr)
 
@@ -61,6 +74,32 @@ def main():
         writer = csv.DictWriter(csvfile, fieldnames=csv_rows[0].keys())
         writer.writeheader()
         writer.writerows(csv_rows)
+
+
+def flatten_business_units(root_business_units: List[BusinessUnit]) -> List[BusinessUnit]:
+    business_units: List[BusinessUnit] = root_business_units.copy()
+    if len(business_units) == 0:
+        return []
+
+    children_business_units: List[BusinessUnit] = []
+    for business_unit in business_units:
+        children_units = business_unit.get('businessUnits', list())
+        for child_unit in children_units:
+            child_unit['parent'] = business_unit
+            children_business_units.append(child_unit)
+
+    business_units.extend(flatten_business_units(children_business_units))
+    return business_units
+
+
+def get_all_assessments(api_client: OstrichApi, business_units: List[BusinessUnit]) -> List[Assessment]:
+    assessments: List[Assessment] = []
+    for business_unit in business_units:
+        print(f"Getting Assessments for {business_unit.get('name', 'Unknown Business Unit')}")
+        bu_assessments = api_client.get_assessments(business_unit['businessUnitId'])
+        print(f'\tFound {len(bu_assessments)} Assessment(s)')
+        assessments.extend(bu_assessments)
+    return assessments
 
 
 def extract_summary(assessment_scores: AssessmentScores) -> Optional[Score]:
@@ -73,16 +112,6 @@ def extract_summary(assessment_scores: AssessmentScores) -> Optional[Score]:
         print(f'summary wasn\'t found in assessment_scores: {assessment_scores}', file=sys.stderr)
 
     return summary
-
-
-def flatten_business_unit(root_business_unit: BusinessUnit) -> List[BusinessUnit]:
-    business_units: List[BusinessUnit] = [root_business_unit]
-    children_business_units: List[BusinessUnit] = root_business_unit.get('businessUnits', list())
-    for child_business_unit in children_business_units:
-        child_business_unit['parent'] = root_business_unit
-        business_units.extend(flatten_business_unit(child_business_unit))
-
-    return business_units
 
 
 if __name__ == '__main__':
