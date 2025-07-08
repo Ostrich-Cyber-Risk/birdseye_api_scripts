@@ -6,6 +6,11 @@ from ostrichApi import OstrichApi, Assessment, AssessmentScores, BusinessUnit, S
 
 
 def main():
+    major_version = sys.version_info.major
+    minor_version = sys.version_info.minor
+    if major_version < 3 or minor_version < 12:
+        raise Exception(f"Running in Python {major_version}.{minor_version} ... Minimum required Python version is 3.12")
+
     api_key: str = input('Enter your Api Key:\n').strip()
     api_client = OstrichApi(api_key=api_key)
 

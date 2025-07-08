@@ -5,6 +5,11 @@ from typing import List, Optional, Dict
 
 
 def main():
+    major_version = sys.version_info.major
+    minor_version = sys.version_info.minor
+    if major_version < 3 or minor_version < 12:
+        raise Exception(f"Running in Python {major_version}.{minor_version} ... Minimum required Python version is 3.12")
+
     api_key: str = input('Enter your Api Key:\n').strip()
     api_client = OstrichApi(api_key=api_key)
 
@@ -73,7 +78,7 @@ def main():
 
     print('End Report. Saving to OstrichAssessmentReport.csv')
     with open('OstrichAssessmentReport.csv', 'w', newline='') as csvfile:
-        writer = csv.DictWriter(svfile, fieldnames=csv_rows[0].keys())
+        writer = csv.DictWriter(csvfile, fieldnames=csv_rows[0].keys())
         writer.writeheader()
         writer.writerows(csv_rows)
 
