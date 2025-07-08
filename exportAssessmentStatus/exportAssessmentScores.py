@@ -55,7 +55,7 @@ def main():
                     'Sub': '',
                     'Email': '',
                     'Score': score.get('score', '(N/A)'),
-                    'LastModifiedAt': 'N/A',
+                    'LastModifiedAt': '(N/A)',
                     'PercentDone': score.get('percentDone', '(N/A)'),
                     'Answered': f'{score.get('answerCount', '(N/A)')}/{score.get('questionCount', '(N/A)')}'})
                 for sub in score.get('subs', set()):
