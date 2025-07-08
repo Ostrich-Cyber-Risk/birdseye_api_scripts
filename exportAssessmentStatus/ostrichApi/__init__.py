@@ -101,6 +101,13 @@ class OstrichApi:
 
     def get_sub_info(self, sub_id: str) -> SubInfo:
         try:
+            # If the score strategy is override all scores will show as being saved by "override-scores"
+            if sub_id == 'override-scores' or sub_id == 'override-targets':
+                return {
+                    'subId': sub_id,
+                    'displayName': sub_id,
+                    'email': 'N/A'
+                }
             # Subs can be business_unit_id::assessment_id if the assessment is a rollup
             # Or in a legacy format that has just business_unit_id
             # Or they are a user

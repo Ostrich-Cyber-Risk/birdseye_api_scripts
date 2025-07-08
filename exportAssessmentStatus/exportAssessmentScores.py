@@ -50,6 +50,7 @@ def main():
                     'Sub': '',
                     'Email': '',
                     'Score': score.get('score', '(N/A)'),
+                    'LastModifiedAt': 'N/A',
                     'PercentDone': score.get('percentDone', '(N/A)'),
                     'Answered': f'{score.get('answerCount', '(N/A)')}/{score.get('questionCount', '(N/A)')}'})
                 for sub in score.get('subs', set()):
@@ -62,7 +63,8 @@ def main():
                         'ItemId': score.get('itemId', 'N/A'),
                         'Sub': sub_info['displayName'],
                         'Email': sub_info['email'],
-                        'Score': sub.get('score', '(N/A)'),
+                        'Score': sub.get('score', 'N/A'),
+                        'LastModifiedAt': sub.get('lastModifiedAt', 'N/A'),
                         'PercentDone': sub.get('percentDone', '(N/A)'),
                         'Answered': f'{sub.get('answerCount', '(N/A)')}/{sub.get('questionCount', '(N/A)')}'})
 
@@ -71,7 +73,7 @@ def main():
 
     print('End Report. Saving to OstrichAssessmentReport.csv')
     with open('OstrichAssessmentReport.csv', 'w', newline='') as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=csv_rows[0].keys())
+        writer = csv.DictWriter(svfile, fieldnames=csv_rows[0].keys())
         writer.writeheader()
         writer.writerows(csv_rows)
 
