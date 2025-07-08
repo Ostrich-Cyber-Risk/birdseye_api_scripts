@@ -68,8 +68,8 @@ def main():
                         'ItemId': score.get('itemId', 'N/A'),
                         'Sub': sub_info['displayName'],
                         'Email': sub_info['email'],
-                        'Score': sub.get('score', 'N/A'),
-                        'LastModifiedAt': sub.get('lastModifiedAt', 'N/A'),
+                        'Score': sub.get('score', '(N/A)'),
+                        'LastModifiedAt': sub.get('lastModifiedAt', '(N/A)'),
                         'PercentDone': sub.get('percentDone', '(N/A)'),
                         'Answered': f'{sub.get('answerCount', '(N/A)')}/{sub.get('questionCount', '(N/A)')}'})
 
