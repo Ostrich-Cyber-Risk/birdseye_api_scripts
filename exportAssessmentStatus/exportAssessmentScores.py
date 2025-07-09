@@ -5,6 +5,11 @@ from typing import List, Optional, Dict
 
 
 def main():
+    major_version = sys.version_info.major
+    minor_version = sys.version_info.minor
+    if major_version != 3 or minor_version < 12:
+        raise Exception(f"Running in Python {major_version}.{minor_version} ... Minimum required Python version is 3.12")
+
     api_key: str = input('Enter your Api Key:\n').strip()
     api_client = OstrichApi(api_key=api_key)
 
@@ -50,6 +55,7 @@ def main():
                     'Sub': '',
                     'Email': '',
                     'Score': score.get('score', '(N/A)'),
+                    'LastModifiedAt': '(N/A)',
                     'PercentDone': score.get('percentDone', '(N/A)'),
                     'Answered': f'{score.get('answerCount', '(N/A)')}/{score.get('questionCount', '(N/A)')}'})
                 for sub in score.get('subs', set()):
@@ -63,6 +69,7 @@ def main():
                         'Sub': sub_info['displayName'],
                         'Email': sub_info['email'],
                         'Score': sub.get('score', '(N/A)'),
+                        'LastModifiedAt': sub.get('lastModifiedAt', '(N/A)'),
                         'PercentDone': sub.get('percentDone', '(N/A)'),
                         'Answered': f'{sub.get('answerCount', '(N/A)')}/{sub.get('questionCount', '(N/A)')}'})
 
