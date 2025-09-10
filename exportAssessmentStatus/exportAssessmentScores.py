@@ -1,5 +1,6 @@
 import csv
 import re
+import argparse
 
 from ostrichApi import OstrichApi, Assessment, AssessmentScores, BusinessUnit, Score, SubInfo
 import sys
@@ -12,14 +13,25 @@ def main():
     if major_version != 3 or minor_version < 12:
         raise Exception(f"Running in Python {major_version}.{minor_version} ... Minimum required Python version is 3.12")
 
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('--itemFilter', required=False, help='A regex filter to apply to item ids. Items with ids not matching the filter will be omitted.', type=re.compile)
+    parser.add_argument('--assessmentFilter', required=False, help='A regex filter to apply to assessment names. Assessments with names not matching the filter will be ignored.', type=re.compile)
+
+    args = parser.parse_args()
+
+    # default to effectively match any
+    if not args.itemFilter:
+        args.itemFilter = re.compile(r'.*')
+    else:
+        print(f'itemFilter - {args.itemFilter.pattern}')
+    if not args.assessmentFilter:
+        args.assessmentFilter = re.compile(r'.*')
+    else:
+        print(f'assessmentFilter - {args.assessmentFilter.pattern}')
+
     api_key: str = input('Enter your Api Key:\n').strip()
     api_client = OstrichApi(api_key=api_key)
-
-    assessment_filter_regex_text: str = input('Optionally enter a regex filter for assessment names:\n').rstrip()
-    assessment_filter_regex: re.Pattern = re.compile(assessment_filter_regex_text if assessment_filter_regex_text else ".*") # default to effectively match any assessmentName
-
-    item_id_regex_text: str = input('Optionally enter a regex filter for item ids:\n').rstrip()
-    item_id_regex: re.Pattern = re.compile(item_id_regex_text if item_id_regex_text else ".*") # default to effectively match any
 
     print('Retrieving Business Units...')
     business_units: List[BusinessUnit] = api_client.get_business_units()
@@ -28,7 +40,7 @@ def main():
 
     print('Retrieving Assessments...')
     flat_assessments: List[Assessment] = get_all_assessments(api_client, flat_business_units)
-    filtered_assessments: List[Assessment] = [assessment for assessment in flat_assessments if assessment_filter_regex.fullmatch(assessment['assessmentName'])]
+    filtered_assessments: List[Assessment] = [assessment for assessment in flat_assessments if args.assessmentFilter.fullmatch(assessment['assessmentName'])]
     print(f'Skipping Filtered Assessments - {[assessment.get('assessmentName') for assessment in flat_assessments if assessment not in filtered_assessments]}')
 
     print('Retrieving Scores and beginning report...')
@@ -57,8 +69,8 @@ def main():
                 f'Hierarchy: {hierarchy}, ParentBusinessUnit: {business_unit.get('parent', dict()).get('name', 'N/A')}, BusinessUnit: {assessment['businessUnitName']}, Assessment: {assessment['assessmentName']}, PercentDone: {summary.get('percentDone', 'N/A')}%, QuestionCount: {summary.get('questionCount', 'N/A')}')
 
             scores = assessment_scores.get('scores', set())
-            filtered_scores = [score for score in scores if item_id_regex.fullmatch(score.get('itemId', 'N/A'))]
-            
+            filtered_scores = [score for score in scores if args.itemFilter.fullmatch(score.get('itemId', 'N/A'))]
+
             for score in filtered_scores:
                 csv_rows.append({
                     'Hierarchy': hierarchy,
