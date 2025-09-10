@@ -1,4 +1,6 @@
 import csv
+import re
+
 from ostrichApi import OstrichApi, Assessment, AssessmentScores, BusinessUnit, Score, SubInfo
 import sys
 from typing import List, Optional, Dict
@@ -13,6 +15,12 @@ def main():
     api_key: str = input('Enter your Api Key:\n').strip()
     api_client = OstrichApi(api_key=api_key)
 
+    assessment_filter_regex_text: str = input('Optionally enter a regex filter for assessment names:\n').rstrip()
+    assessment_filter_regex: re.Pattern = re.compile(assessment_filter_regex_text if assessment_filter_regex_text else ".*") # default to effectively match any assessmentName
+
+    item_id_regex_text: str = input('Optionally enter a regex filter for item ids:\n').rstrip()
+    item_id_regex: re.Pattern = re.compile(item_id_regex_text if item_id_regex_text else ".*") # default to effectively match any
+
     print('Retrieving Business Units...')
     business_units: List[BusinessUnit] = api_client.get_business_units()
     flat_business_units: List[BusinessUnit] = flatten_business_units(business_units)
@@ -20,10 +28,12 @@ def main():
 
     print('Retrieving Assessments...')
     flat_assessments: List[Assessment] = get_all_assessments(api_client, flat_business_units)
+    filtered_assessments: List[Assessment] = [assessment for assessment in flat_assessments if assessment_filter_regex.fullmatch(assessment['assessmentName'])]
+    print(f'Skipping Filtered Assessments - {[assessment.get('assessmentName') for assessment in flat_assessments if assessment not in filtered_assessments]}')
 
     print('Retrieving Scores and beginning report...')
     csv_rows: List[dict] = []
-    for assessment in flat_assessments:
+    for assessment in filtered_assessments:
         try:
             assessment_scores: AssessmentScores = api_client.get_assessment_scores(assessment['businessUnitId'], assessment['assessmentId'])
         except Exception as e:
@@ -45,7 +55,11 @@ def main():
 
             print(
                 f'Hierarchy: {hierarchy}, ParentBusinessUnit: {business_unit.get('parent', dict()).get('name', 'N/A')}, BusinessUnit: {assessment['businessUnitName']}, Assessment: {assessment['assessmentName']}, PercentDone: {summary.get('percentDone', 'N/A')}%, QuestionCount: {summary.get('questionCount', 'N/A')}')
-            for score in assessment_scores.get('scores', set()):
+
+            scores = assessment_scores.get('scores', set())
+            filtered_scores = [score for score in scores if item_id_regex.fullmatch(score.get('itemId', 'N/A'))]
+            
+            for score in filtered_scores:
                 csv_rows.append({
                     'Hierarchy': hierarchy,
                     'ParentBusinessUnit': business_unit.get('parent', dict()).get('name', 'N/A'),
@@ -75,6 +89,10 @@ def main():
 
         except Exception as e:
             print(f'Error handling assessment {assessment.get('assessmentName', 'Unknown Assessment')}: {e}', file=sys.stderr)
+
+    if len(csv_rows) == 0:
+        print('No results were found or all were filtered.')
+        return
 
     print('End Report. Saving to OstrichAssessmentReport.csv')
     with open('OstrichAssessmentReport.csv', 'w', newline='') as csvfile:
