@@ -125,7 +125,7 @@ class OstrichApi:
                     'displayName': f"{sub.get('businessUnitName', 'UnknownBusinessUnit')}::{sub.get('assessmentName', 'UnknownAssessmentName')}",
                     'email': 'N/A'
                 }
-            elif len(sub_id) == 20:
+            elif len(sub_id) == 20 or sub_id == 'override-targets' or sub_id == 'override-scores': # Legacy format or override targets/scores
                 return {
                     'subId': sub_id,
                     'displayName': sub_id,
