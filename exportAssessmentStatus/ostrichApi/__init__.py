@@ -70,10 +70,12 @@ def _handle_response(response: requests.Response) -> Any:
 class OstrichApi:
     def __init__(self, api_key: str, base_url: str = 'https://api.ostrichcyber-risk.com'):
         self._base_url: Final[str] = base_url
+        self._api_key: str = api_key
         self._token = self.__get_token_from_key(api_key)
 
     def __get_token_from_key(self, api_key: str) -> str:
-        response = requests.post(f'{self._base_url}/v1/auth/token', json={'apiKey': api_key})
+        url = f'{self._base_url}/v1/auth/token'
+        response = requests.post(url, json={'apiKey': api_key})
         return _handle_response(response)['token']
 
     @cache
@@ -81,6 +83,10 @@ class OstrichApi:
         response = method(url, headers={'Authorization': f'Bearer {self._token}'})
         if response.status_code == 500:
             response.raise_for_status()
+        elif response.status_code == 401:
+            print("unauthorized - regenerating token and retrying")
+            self._token = self.__get_token_from_key(self._api_key)
+            response = method(url, headers={'Authorization': f'Bearer {self._token}'})
         return response
 
     def get_business_units(self) -> List[BusinessUnit]:
@@ -89,6 +95,8 @@ class OstrichApi:
 
     def get_assessments(self, business_unit_id: str) -> List[Assessment]:
         response = self.__make_api_call(f'{self._base_url}/v1/businessUnits/{business_unit_id}/assessments')
+        if response.status_code == 403:
+            return []
         return _handle_response(response)['assessments']
 
     def get_assessment_scores(self, business_unit_id: str, assessment_id: str) -> AssessmentScores:

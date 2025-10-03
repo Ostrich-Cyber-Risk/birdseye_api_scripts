@@ -41,7 +41,7 @@ def main():
     print('Retrieving Assessments...')
     flat_assessments: List[Assessment] = get_all_assessments(api_client, flat_business_units)
     filtered_assessments: List[Assessment] = [assessment for assessment in flat_assessments if args.assessmentFilter.fullmatch(assessment['assessmentName'])]
-    print(f'Skipping Filtered Assessments - {[assessment.get('assessmentName') for assessment in flat_assessments if assessment not in filtered_assessments]}')
+    print(f'Skipping Filtered Assessments - {[assessment.get("assessmentName") for assessment in flat_assessments if assessment not in filtered_assessments]}')
 
     print('Retrieving Scores and beginning report...')
     csv_rows: List[dict] = []
@@ -49,12 +49,12 @@ def main():
         try:
             assessment_scores: AssessmentScores = api_client.get_assessment_scores(assessment['businessUnitId'], assessment['assessmentId'])
         except Exception as e:
-            print(f'Failed to get scores for {assessment['assessmentName']}: {e}', file=sys.stderr)
+            print(f"Failed to get scores for {assessment['assessmentName']}: {e}", file=sys.stderr)
             continue
 
         summary: Optional[Score] = extract_summary(assessment_scores)
         if summary is None:
-            print(f'Summary Not Available for Assessment - BusinessUnit: {assessment['businessUnitName']} Assessment: {assessment['assessmentName']}', file=sys.stderr)
+            print(f"Summary Not Available for Assessment - BusinessUnit: {assessment['businessUnitName']} Assessment: {assessment['assessmentName']}", file=sys.stderr)
             continue
 
         try:
@@ -63,10 +63,10 @@ def main():
             current_business_unit = business_unit
             while current_business_unit.get('parent') is not None:
                 current_business_unit = current_business_unit.get('parent')
-                hierarchy = f'{current_business_unit.get('name', 'N/A')} > {hierarchy}'
+                hierarchy = f"{current_business_unit.get('name', 'N/A')} > {hierarchy}"
 
             print(
-                f'Hierarchy: {hierarchy}, ParentBusinessUnit: {business_unit.get('parent', dict()).get('name', 'N/A')}, BusinessUnit: {assessment['businessUnitName']}, Assessment: {assessment['assessmentName']}, PercentDone: {summary.get('percentDone', 'N/A')}%, QuestionCount: {summary.get('questionCount', 'N/A')}')
+                f"Hierarchy: {hierarchy}, ParentBusinessUnit: {business_unit.get('parent', dict()).get('name', 'N/A')}, BusinessUnit: {assessment['businessUnitName']}, Assessment: {assessment['assessmentName']}, PercentDone: {summary.get('percentDone', 'N/A')}%, QuestionCount: {summary.get('questionCount', 'N/A')}")
 
             scores = assessment_scores.get('scores', set())
             filtered_scores = [score for score in scores if args.itemFilter.fullmatch(score.get('itemId', 'N/A'))]
@@ -83,7 +83,7 @@ def main():
                     'Score': score.get('score', '(N/A)'),
                     'LastModifiedAt': '(N/A)',
                     'PercentDone': score.get('percentDone', '(N/A)'),
-                    'Answered': f'{score.get('answerCount', '(N/A)')}/{score.get('questionCount', '(N/A)')}'})
+                    'Answered': f"{score.get('answerCount', '(N/A)')}/{score.get('questionCount', '(N/A)')}"})
                 for sub in score.get('subs', set()):
                     sub_info: SubInfo = api_client.get_sub_info(sub['subId'])
                     csv_rows.append({
@@ -97,10 +97,10 @@ def main():
                         'Score': sub.get('score', '(N/A)'),
                         'LastModifiedAt': sub.get('lastModifiedAt', '(N/A)'),
                         'PercentDone': sub.get('percentDone', '(N/A)'),
-                        'Answered': f'{sub.get('answerCount', '(N/A)')}/{sub.get('questionCount', '(N/A)')}'})
+                        'Answered': f"{sub.get('answerCount', '(N/A)')}/{sub.get('questionCount', '(N/A)')}"})
 
         except Exception as e:
-            print(f'Error handling assessment {assessment.get('assessmentName', 'Unknown Assessment')}: {e}', file=sys.stderr)
+            print(f"Error handling assessment {assessment.get('assessmentName', 'Unknown Assessment')}: {e}", file=sys.stderr)
 
     if len(csv_rows) == 0:
         print('No results were found or all were filtered.')
