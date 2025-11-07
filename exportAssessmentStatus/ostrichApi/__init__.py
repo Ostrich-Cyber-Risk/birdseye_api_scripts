@@ -93,8 +93,11 @@ class OstrichApi:
         response = self.__make_api_call(f'{self._base_url}/v1/businessUnits/')
         return _handle_response(response)['businessUnits']
 
-    def get_assessments(self, business_unit_id: str) -> List[Assessment]:
-        response = self.__make_api_call(f'{self._base_url}/v1/businessUnits/{business_unit_id}/assessments')
+    def get_assessments(self, business_unit_id: str, after:str = None) -> List[Assessment]:
+        url = f'{self._base_url}/v1/businessUnits/{business_unit_id}/assessments'
+        if after != None :
+            url += f'?after={after}'
+        response = self.__make_api_call(url)
         if response.status_code == 403:
             return []
         return _handle_response(response)['assessments']

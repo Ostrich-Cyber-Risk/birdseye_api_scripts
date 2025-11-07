@@ -15,6 +15,7 @@ def main():
 
     parser = argparse.ArgumentParser()
 
+    parser.add_argument('--dateFilter', required=False, help='Only returns assessments that have been modified since the date passed in. Eg: 2006-01-02T15:04:05.000000000-07:00', type=str)
     parser.add_argument('--itemFilter', required=False, help='A regex filter to apply to item ids. Items with ids not matching the filter will be omitted.', type=re.compile)
     parser.add_argument('--assessmentFilter', required=False, help='A regex filter to apply to assessment names. Assessments with names not matching the filter will be ignored.', type=re.compile)
 
@@ -39,7 +40,7 @@ def main():
     mapped_business_units: Dict[str, BusinessUnit] = {bu['businessUnitId']: bu for bu in flat_business_units}
 
     print('Retrieving Assessments...')
-    flat_assessments: List[Assessment] = get_all_assessments(api_client, flat_business_units)
+    flat_assessments: List[Assessment] = get_all_assessments(api_client, flat_business_units, after=args.dateFilter)
     filtered_assessments: List[Assessment] = [assessment for assessment in flat_assessments if args.assessmentFilter.fullmatch(assessment['assessmentName'])]
     print(f'Skipping Filtered Assessments - {[assessment.get("assessmentName") for assessment in flat_assessments if assessment not in filtered_assessments]}')
 
@@ -129,11 +130,11 @@ def flatten_business_units(root_business_units: List[BusinessUnit]) -> List[Busi
     return business_units
 
 
-def get_all_assessments(api_client: OstrichApi, business_units: List[BusinessUnit]) -> List[Assessment]:
+def get_all_assessments(api_client: OstrichApi, business_units: List[BusinessUnit], after: str = None) -> List[Assessment]:
     assessments: List[Assessment] = []
     for business_unit in business_units:
         print(f"Getting Assessments for {business_unit.get('name', 'Unknown Business Unit')}")
-        bu_assessments = api_client.get_assessments(business_unit['businessUnitId'])
+        bu_assessments = api_client.get_assessments(business_unit['businessUnitId'], after)
         print(f'\tFound {len(bu_assessments)} Assessment(s)')
         assessments.extend(bu_assessments)
     return assessments
