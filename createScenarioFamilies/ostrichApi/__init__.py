@@ -1,5 +1,4 @@
 import sys
-from functools import cache
 from typing import TypedDict, Any, Final
 
 import requests
@@ -30,7 +29,6 @@ class OstrichApi:
         return _handle_response(response)['token']
 
 
-    @cache
     def create_scenario_family_api_call(self, name: str, description: str, bu_id: str):
         url = f'{self._base_url}/v1/businessUnits/{bu_id}/scenarioFamilies'
         response = requests.post(url, headers={'Authorization': f'Bearer {self._token}'}, json={'scenarioFamily': {'name': name, 'description': description}})
