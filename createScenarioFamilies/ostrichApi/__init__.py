@@ -5,7 +5,7 @@ from typing import TypedDict, Any, Final
 import requests
 
 
-class ScenarioFamilyRequest(TypedDict):
+class ScenarioFamilyRequestInfo(TypedDict):
     businessUnitId: str
     name: str
     description: str
@@ -31,14 +31,13 @@ class OstrichApi:
 
 
     @cache
-    def create_scenario_family_api_call(self, request: ScenarioFamilyRequest):
-        url = f'{self._base_url}/v1/businessUnits/{request.get('businessUnitId')}/scenarioFamilies'
-        response = requests.post(url, headers={'Authorization': f'Bearer {self._token}'}, data={'name': request.get('name'), 'description': request.get('description')})
-        if response.status_code == 500:
-            response.raise_for_status()
-        elif response.status_code == 401:
+    def create_scenario_family_api_call(self, name: str, description: str, bu_id: str):
+        url = f'{self._base_url}/v1/businessUnits/{bu_id}/scenarioFamilies'
+        response = requests.post(url, headers={'Authorization': f'Bearer {self._token}'}, json={'scenarioFamily': {'name': name, 'description': description}})
+        if response.status_code == 401:
             print("unauthorized - regenerating token and retrying")
             self._token = self.__get_token_from_key(self._api_key)
-            response = requests.post(url, headers={'Authorization': f'Bearer {self._token}'}, data={'name': request.get('name'), 'description': request.get('description')})
-        _handle_response(response)
+            response = requests.post(url, headers={'Authorization': f'Bearer {self._token}'}, json={'scenarioFamily': {'name': name, 'description': description}})
+        if response.status_code != 200:
+            print(response.status_code, response.json(), file=sys.stderr)
 

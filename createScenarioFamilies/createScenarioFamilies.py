@@ -1,7 +1,7 @@
-import csv
 import sys
 from typing import List
-from ostrichApi import OstrichApi, ScenarioFamilyRequest
+from ostrichApi import OstrichApi, ScenarioFamilyRequestInfo
+import pandas as pd
 
 def main():
     major_version = sys.version_info.major
@@ -12,20 +12,19 @@ def main():
     api_key: str = input('Enter your Api Key:\n').strip()
     api_client = OstrichApi(api_key=api_key)
 
-    file_path = input('Enter the path to the csv file containing the scenario family information:\n').strip()
-    scenario_families: List[ScenarioFamilyRequest] = []
-    with open(file_path, mode='r') as csv_file:
-        csv_reader = csv.DictReader(csv_file)
-        for row in csv_reader:
-            scenario_families.append({
-                'businessUnitId': row['businessUnitId'],
-                'name': row['name'],
-                'description': row['description']
-            })
+    scenario_families: List[ScenarioFamilyRequestInfo] = []
+    families_df = pd.read_csv("create scenario family test.csv", header=0)
+
+    for i, row in families_df.iterrows():
+        scenario_families.append({
+            'businessUnitId': row['businessUnitId'],
+            'name': row['name'],
+            'description': row['description']
+        })
 
 
     for family in scenario_families:
-        api_client.create_scenario_family_api_call(family)
+        api_client.create_scenario_family_api_call(family.get('name'), family.get('description'), family.get('businessUnitId'))
 
 
 if __name__ == '__main__':
