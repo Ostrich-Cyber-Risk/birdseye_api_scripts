@@ -39,5 +39,4 @@ class OstrichApi:
             self._token = self.__get_token_from_key(self._api_key)
             response = requests.post(url, headers={'Authorization': f'Bearer {self._token}'}, json={'scenarioFamily': {'name': name, 'description': description}})
         if response.status_code != 200:
-            print(response.status_code, response.json(), file=sys.stderr)
-
+            print('Failed to create family: ', response.status_code, response.json(), file=sys.stderr)

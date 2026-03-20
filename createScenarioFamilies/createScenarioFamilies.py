@@ -13,7 +13,7 @@ def main():
     api_client = OstrichApi(api_key=api_key)
 
     scenario_families: List[ScenarioFamilyRequestInfo] = []
-    families_df = pd.read_csv("create scenario family test.csv", header=0)
+    families_df = pd.read_csv("create scenario family example.csv", header=0)
 
     for i, row in families_df.iterrows():
         scenario_families.append({
