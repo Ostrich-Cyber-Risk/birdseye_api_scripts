@@ -24,9 +24,8 @@ The script asks for a key when it starts. To create one in Birdseye:
 
 Two things about roles:
 
-- Saving a target requires the `assessments.targets:create` permission, and **Manager** is the only
-  role available to an API key that carries it. A key holding only practitioner roles gets a 403 on
-  every save.
+- Saving a target requires the **Manager** role on the business unit. None of the other roles an API
+  key can hold are enough, so a key granted only practitioner roles gets a 403 on every save.
 - Your own account needs the API access role on a business unit before you can create keys against
   it. A Birdseye administrator at your organization grants that.
 
@@ -150,15 +149,15 @@ matching a pattern against the ids.
 
 ## Errors
 
-| Message                                                    | What to do                                                     |
-|------------------------------------------------------------|----------------------------------------------------------------|
-| 403 `does not have the assessments.targets:create ...`     | Add the Manager role to the key on that business unit          |
-| `Cannot set targets on a closed assessment`                | Reopen the assessment, or pick a different one                 |
-| `Cannot set targets on ignored questions`                  | The control is ignored on that business unit, so remove the row|
-| `Invalid aspect id: X`                                     | The id does not exist on the assessment; take it from a template|
-| `Invalid target of N for aspect id: X`                     | The control does not accept that value                         |
-| `Invalid weight: X`                                        | Use one of the five weight labels                              |
-| `Cannot have duplicate aspect ids: X`                      | The same aspect appears twice for one assessment               |
+| Message                                                | What to do                                                          |
+|--------------------------------------------------------|---------------------------------------------------------------------|
+| 403 naming a role the key is missing                   | Add the Manager role to the key on that business unit               |
+| `Cannot save scores or targets on a closed assessment` | Reopen the assessment, or pick a different one                      |
+| `Cannot set targets on ignored questions`              | The control is ignored on that business unit, so remove the row     |
+| `Invalid aspect id: X`                                 | The id does not exist on the assessment, so take it from a template |
+| `Invalid target of N for aspect id: X`                 | The control does not accept that value                              |
+| `Invalid weight: X`                                    | Use one of the five weight labels                                   |
+| `Cannot have duplicate aspect ids: X`                  | The same aspect appears twice for one assessment                    |
 
 ## What it does not do
 
