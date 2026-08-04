@@ -13,7 +13,11 @@ currently on it. You fill in the values you want. `--apply` sends them back.
 
 ## Generate an API key
 
-The script asks for a key when it starts. To create one in Birdseye:
+The script asks for a key when it starts, without showing it as you type. For an unattended run, put
+it in the `OSTRICH_API_KEY` environment variable instead. Do not pipe it in on standard input, because
+the script also reads your answers to its prompts from there.
+
+To create a key in Birdseye:
 
 1. Go to **Account info**
 2. Find the **API keys** section and choose **Generate key**. The first time, you also have to accept
@@ -37,8 +41,8 @@ matters when a business unit averages targets, described next.
 Every business unit uses one of two target strategies, which you can see and change on the business
 unit's settings.
 
-| Strategy      | How a target is stored                                                                     |
-|---------------|--------------------------------------------------------------------------------------------|
+| Strategy      | How a target is stored                                                                      |
+|---------------|---------------------------------------------------------------------------------------------|
 | **Aggregate** | Each manager keeps their own target for a control. The value shown is the average of those. |
 | **Override**  | One target per control for the whole assessment, whoever sets it.                           |
 
@@ -76,8 +80,11 @@ python setTargets.py --template --businessUnitFilter ".*Region.*" --assessmentFi
 
 Both filters match the whole name, so wrap them in `.*` to match part of one.
 
-Fill in the `target` and `weight` columns of `OstrichTargetTemplate.csv`, then check the file without
-sending anything:
+The template goes to `OstrichTargetTemplate.csv` unless you name a file, as in `--template targets.csv`.
+It will not replace a file that already exists, so a half-filled template cannot be lost by re-running
+the command. Pass `--overwrite` when replacing it is what you want.
+
+Fill in the `target` and `weight` columns, then check the file without sending anything:
 
 ```
 python setTargets.py --apply OstrichTargetTemplate.csv --dryRun
@@ -90,19 +97,26 @@ python setTargets.py --apply OstrichTargetTemplate.csv
 ```
 
 Rows with both `target` and `weight` left blank are skipped, so you can fill in part of a template and
-leave the rest alone. `--yes` answers the shared-targets prompt for you, for unattended runs.
+leave the rest alone.
+
+For an unattended run, pass `--yes`. That answers the shared-targets prompt described below. Without a
+terminal to answer it, the script refuses to start rather than stopping partway through.
+
+If you edit the file in Excel, save it with **File, Save As, CSV UTF-8 (comma delimited)**. Other CSV
+options write a file the script cannot read when any business unit or assessment name contains an
+accented or non-Latin character.
 
 ## CSV format
 
 Only three columns are required, plus at least one of `target` and `weight`:
 
-| Column           | Required | Notes                                                              |
-|------------------|----------|--------------------------------------------------------------------|
-| `businessUnitId` | yes      | From the template, or the business unit URL in the app             |
-| `assessmentId`   | yes      | From the template, or the assessment URL in the app                |
-| `aspectId`       | yes      | For example `GV.OC-1-PROCESS`                                      |
-| `target`         | one of   | Whole number                                                       |
-| `weight`         | one of   | `LOW`, `MED-LOW`, `MEDIUM`, `MED-HIGH`, `HIGH`                     |
+| Column           | Required | Notes                                                  |
+|------------------|----------|--------------------------------------------------------|
+| `businessUnitId` | yes      | From the template, or the business unit URL in the app |
+| `assessmentId`   | yes      | From the template, or the assessment URL in the app    |
+| `aspectId`       | yes      | For example `GV.OC-1-PROCESS`                          |
+| `target`         | one of   | Whole number                                           |
+| `weight`         | one of   | `LOW`, `MED-LOW`, `MEDIUM`, `MED-HIGH`, `HIGH`         |
 
 `set targets example.csv` is the smallest file that works. Any other column is ignored, which is why
 the template can carry `businessUnit`, `assessment`, `currentTarget` and `currentWeight` for reading
@@ -116,30 +130,42 @@ Weight is case-insensitive on input. A blank weight leaves the existing weight a
 
 ## What the script checks before saving
 
-- Every `aspectId` in a batch exists on that assessment. The API rejects a whole request if one
-  aspect id is wrong, so the script stops that assessment rather than sending a batch that cannot
-  succeed.
+The API saves one assessment's targets as a single unit: if it rejects anything in the request, none of
+it is saved. The script works the same way, so a file with one bad row never leaves an assessment
+half-loaded.
+
+- Every `aspectId` exists on that assessment. If any does not, that assessment is skipped and nothing
+  is sent for it.
 - No aspect id appears twice for the same assessment, which the API also rejects.
+- Every `target` is a whole number and every `weight` is one of the five labels. **A single bad row
+  skips its whole assessment**, so fix the row and re-run rather than expecting the other rows to have
+  gone in.
 - Whether anyone already has targets on the assessment, and who.
 
-After each save it re-reads the assessment and confirms the values came back. Anything that does not
-is listed at the end, and the script exits non-zero if any row was rejected, any assessment failed, or
-any value did not read back.
+After each save it re-reads the assessment and reports any requested value that is not there. On an
+aggregate business unit the API does not say which manager a value belongs to, so this confirms the
+value is present on the assessment rather than proving it is recorded against your account.
+
+The script exits non-zero if any row was rejected, any assessment was skipped or failed, or any saved
+value did not read back, so a wrapper script can rely on the exit status.
 
 ## API calls
 
-| Purpose                          | Call                                                                          |
-|----------------------------------|-------------------------------------------------------------------------------|
-| Exchange the key for a token     | `POST /v1/auth/token`                                                         |
-| List business units              | `GET /v1/businessUnits/`                                                      |
-| Read the target strategy         | `GET /v1/businessUnits/{businessUnitId}`                                      |
-| List assessments                 | `GET /v1/businessUnits/{businessUnitId}/assessments`                          |
-| List the aspects of an assessment| `GET /v1/businessUnits/{businessUnitId}/assessments/{assessmentId}/content`    |
-| Read current targets             | `GET /v1/businessUnits/{businessUnitId}/assessments/{assessmentId}/scores`     |
-| Save targets                     | `PUT /v1/businessUnits/{businessUnitId}/assessments/{assessmentId}/targets`    |
+| Purpose                           | Call                                                                        |
+|-----------------------------------|-----------------------------------------------------------------------------|
+| Exchange the key for a token      | `POST /v1/auth/token`                                                       |
+| List business units               | `GET /v1/businessUnits/`                                                    |
+| Read the target strategy          | `GET /v1/businessUnits/{businessUnitId}`                                    |
+| List assessments                  | `GET /v1/businessUnits/{businessUnitId}/assessments`                        |
+| List the aspects of an assessment | `GET /v1/businessUnits/{businessUnitId}/assessments/{assessmentId}/content` |
+| Read current targets              | `GET /v1/businessUnits/{businessUnitId}/assessments/{assessmentId}/scores`  |
+| Save targets                      | `PUT /v1/businessUnits/{businessUnitId}/assessments/{assessmentId}/targets` |
 
 The token from `/v1/auth/token` expires. When a call comes back 401 the script requests a new token
-and retries once, so long runs do not need restarting.
+and retries once, so long runs do not need restarting. Every call has a three minute timeout.
+
+`--baseUrl` points the script at a different Birdseye deployment. It has to be `https`, since the key
+and the token both cross that connection.
 
 The set of aspects comes from combining two calls. `/scores` returns one entry per function,
 category, question and aspect, and the `nodes` map in `/content` holds every function, category and

@@ -1,5 +1,6 @@
 import sys
 from typing import Any, Dict, Final, List, NotRequired, Optional, Tuple, TypedDict
+from urllib.parse import urlparse
 
 import requests
 
@@ -7,13 +8,14 @@ PROD_BASE_URL: Final[str] = 'https://api.ostrichcyber-risk.com'
 SUMMARY_ITEM_ID: Final[str] = 'summary'
 WEIGHTS: Final[Tuple[str, ...]] = ('LOW', 'MED-LOW', 'MEDIUM', 'MED-HIGH', 'HIGH')
 OVERRIDE_STRATEGY: Final[str] = 'override'
+REQUEST_TIMEOUT: Final[int] = 180
+LOCAL_HOSTS: Final[Tuple[str, ...]] = ('localhost', '127.0.0.1')
 
 
 class BusinessUnit(TypedDict):
     businessUnitId: str
     name: str
     businessUnits: NotRequired[List['BusinessUnit']]
-    parent: NotRequired['BusinessUnit']
 
 
 class Assessment(TypedDict):
@@ -54,14 +56,24 @@ def _error_message(response: requests.Response) -> str:
     return str(body)
 
 
+def _require_secure_url(base_url: str) -> str:
+    # The API key and the bearer token derived from it both cross this connection.
+    trimmed = base_url.rstrip('/')
+    parsed = urlparse(trimmed)
+    if parsed.scheme != 'https' and parsed.hostname not in LOCAL_HOSTS:
+        raise ValueError(f'{trimmed} is not https, so the API key would be sent in the clear.')
+    return trimmed
+
+
 class OstrichApi:
     def __init__(self, api_key: str, base_url: str = PROD_BASE_URL) -> None:
-        self._base_url: Final[str] = base_url.rstrip('/')
+        self._base_url: Final[str] = _require_secure_url(base_url)
         self._api_key: str = api_key
         self._token: str = self._mint_token()
 
     def _mint_token(self) -> str:
-        response = requests.post(f'{self._base_url}/v1/auth/token', json={'apiKey': self._api_key})
+        response = requests.post(f'{self._base_url}/v1/auth/token', json={'apiKey': self._api_key},
+                                 timeout=REQUEST_TIMEOUT)
         if response.status_code != 200:
             raise ApiError(response.status_code, _error_message(response))
         return response.json()['response']['token']
@@ -69,12 +81,12 @@ class OstrichApi:
     def _request(self, method: str, path: str, body: Optional[dict] = None,
                  tolerate: Tuple[int, ...] = ()) -> Any:
         url = f'{self._base_url}{path}'
-        response = requests.request(method, url, json=body,
+        response = requests.request(method, url, json=body, timeout=REQUEST_TIMEOUT,
                                     headers={'Authorization': f'Bearer {self._token}'})
         if response.status_code == 401:
             print('  token rejected, requesting a new one', file=sys.stderr)
             self._token = self._mint_token()
-            response = requests.request(method, url, json=body,
+            response = requests.request(method, url, json=body, timeout=REQUEST_TIMEOUT,
                                         headers={'Authorization': f'Bearer {self._token}'})
         if response.status_code in tolerate:
             return None
@@ -88,12 +100,12 @@ class OstrichApi:
     def get_business_unit(self, business_unit_id: str) -> dict:
         return self._request('GET', f'/v1/businessUnits/{business_unit_id}')
 
-    def get_assessments(self, business_unit_id: str) -> List[Assessment]:
-        # A key sees the whole business unit tree, so a 403 means the key was not granted
-        # anything on this one rather than that something went wrong.
+    def get_assessments(self, business_unit_id: str) -> Optional[List[Assessment]]:
+        """None means the key holds no roles on this business unit. A key can see the whole tree but
+        is granted roles on part of it, so that is an expected answer rather than a failure."""
         payload = self._request('GET', f'/v1/businessUnits/{business_unit_id}/assessments',
                                 tolerate=(403,))
-        return [] if payload is None else payload['assessments']
+        return None if payload is None else payload['assessments']
 
     def get_assessment_content(self, business_unit_id: str, assessment_id: str) -> dict:
         path = f'/v1/businessUnits/{business_unit_id}/assessments/{assessment_id}/content'
@@ -109,23 +121,17 @@ class OstrichApi:
         self._request('PUT', path, {'targets': targets})
 
 
-def flatten_business_units(root_units: List[BusinessUnit]) -> List[BusinessUnit]:
-    flattened: List[BusinessUnit] = []
+def flatten_business_units(root_units: List[BusinessUnit],
+                           parent_path: str = '') -> List[Tuple[str, BusinessUnit]]:
+    """Each unit paired with its full path through the hierarchy, for display. The path is built on
+    the way down rather than stored on the units, so the payload from the API is left alone."""
+    flattened: List[Tuple[str, BusinessUnit]] = []
     for unit in root_units:
-        flattened.append(unit)
-        for child in unit.get('businessUnits', []):
-            child['parent'] = unit
-            flattened.extend(flatten_business_units([child]))
+        name = unit.get('name', 'Unknown')
+        path = f'{parent_path} > {name}' if parent_path else name
+        flattened.append((path, unit))
+        flattened.extend(flatten_business_units(unit.get('businessUnits', []), path))
     return flattened
-
-
-def business_unit_path(unit: BusinessUnit) -> str:
-    names = [unit.get('name', 'Unknown')]
-    current = unit
-    while current.get('parent') is not None:
-        current = current['parent']
-        names.append(current.get('name', 'Unknown'))
-    return ' > '.join(reversed(names))
 
 
 def leaf_assessments(assessments: List[Assessment]) -> List[Assessment]:
@@ -150,6 +156,19 @@ def aspect_subs(scores: dict, aspect_id: str) -> List[dict]:
         if item['itemId'] == aspect_id:
             return item.get('subs', [])
     return []
+
+
+def sub_holds(sub: dict, target: TargetRequest) -> bool:
+    """Whether a single contributor holds everything the request asked for. Target and weight have to
+    come from the same contributor, otherwise one manager's target paired with another's weight would
+    read back as a match."""
+    if 'target' in target:
+        saved = sub.get('target')
+        if saved is None or float(saved) != float(target['target']):
+            return False
+    if 'weight' in target and sub.get('weightLabel') != target['weight']:
+        return False
+    return True
 
 
 def target_contributors(scores: dict, aspects: List[str]) -> List[Contributor]:
