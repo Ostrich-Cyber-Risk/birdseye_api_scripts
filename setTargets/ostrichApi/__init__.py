@@ -79,7 +79,7 @@ class OstrichApi:
         return response.json()['response']['token']
 
     def _request(self, method: str, path: str, body: Optional[dict] = None,
-                 tolerate: Tuple[int, ...] = ()) -> Any:
+                 tolerate: Tuple[int, ...] = (), has_response_body: bool = True) -> Any:
         url = f'{self._base_url}{path}'
         response = requests.request(method, url, json=body, timeout=REQUEST_TIMEOUT,
                                     headers={'Authorization': f'Bearer {self._token}'})
@@ -92,7 +92,9 @@ class OstrichApi:
             return None
         if response.status_code != 200:
             raise ApiError(response.status_code, _error_message(response))
-        return response.json()['response']
+        # Save-targets only ever returns {"message": ...}, no "response" envelope. Every read
+        # endpoint returns one, so this is opt-out rather than opt-in.
+        return response.json()['response'] if has_response_body else None
 
     def get_business_units(self) -> List[BusinessUnit]:
         return self._request('GET', '/v1/businessUnits/')['businessUnits']
@@ -118,7 +120,7 @@ class OstrichApi:
     def save_targets(self, business_unit_id: str, assessment_id: str,
                      targets: List[TargetRequest]) -> None:
         path = f'/v1/businessUnits/{business_unit_id}/assessments/{assessment_id}/targets'
-        self._request('PUT', path, {'targets': targets})
+        self._request('PUT', path, {'targets': targets}, has_response_body=False)
 
 
 def flatten_business_units(root_units: List[BusinessUnit],

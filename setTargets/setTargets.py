@@ -245,8 +245,12 @@ def apply_targets(api_client: OstrichApi, args: argparse.Namespace) -> None:
         strategy = strategies[business_unit_id]
 
         contributors = target_contributors(scores, aspects)
-        if contributors and strategy != OVERRIDE_STRATEGY and not args.yes:
-            if not confirm_shared_targets(contributors):
+        if contributors and strategy != OVERRIDE_STRATEGY:
+            if args.dryRun:
+                listed = ', '.join(f"{c['name']} ({c['aspectCount']} aspect(s))" for c in contributors)
+                print(f'  targets already exist here, set by: {listed}')
+                print('  this business unit averages targets, so a real run would ask before saving')
+            elif not args.yes and not confirm_shared_targets(contributors):
                 print('  skipped')
                 continue
 
@@ -388,8 +392,12 @@ def confirm_shared_targets(contributors: List[Contributor]) -> bool:
     try:
         return input('  continue? [y/N] ').strip().lower() in ('y', 'yes')
     except EOFError:
-        print('  no answer available, treating as no', file=sys.stderr)
-        return False
+        # isatty() at startup is not reliable on every platform (a redirected stdin can still
+        # report as a terminal), so this is the backstop: stop the whole run rather than treat
+        # an unanswerable prompt as "no" and report success on an assessment that was skipped.
+        raise SetupError('No terminal available to confirm writes to assessments that already '
+                         'have targets. Re-run with --yes to accept them all, or --dryRun to '
+                         'check the file.') from None
 
 
 def read_back(api_client: OstrichApi, business_unit_id: str, assessment_id: str,
