@@ -97,7 +97,7 @@ class OstrichApi:
         return response.json()['response'] if has_response_body else None
 
     def get_business_units(self) -> List[BusinessUnit]:
-        return self._request('GET', '/v1/businessUnits/')['businessUnits']
+        return self._request('GET', '/v1/businessUnits')['businessUnits']
 
     def get_business_unit(self, business_unit_id: str) -> dict:
         return self._request('GET', f'/v1/businessUnits/{business_unit_id}')
