@@ -1,0 +1,5 @@
+businessUnitId,assessmentId,aspectId,target,weight
+business_unit_id_1,assessment_id_1,GV.OC-1-PROCESS,75,HIGH
+business_unit_id_1,assessment_id_1,GV.OC-1-COVERAGE,80,
+business_unit_id_1,assessment_id_2,ID.AM-1-PROCESS,50,MED-LOW
+business_unit_id_2,assessment_id_3,PR.AA-1-PROCESS,,MEDIUM
