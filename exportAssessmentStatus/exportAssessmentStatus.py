@@ -1,5 +1,6 @@
 import csv
 import sys
+import argparse
 from typing import Dict, List, Optional
 from exportAssessmentScores import flatten_business_units, get_all_assessments
 from ostrichApi import OstrichApi, Assessment, AssessmentScores, BusinessUnit, Score, SubInfo
@@ -11,6 +12,10 @@ def main():
     if major_version != 3 or minor_version < 12:
         raise Exception(f"Running in Python {major_version}.{minor_version} ... Minimum required Python version is 3.12")
 
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--dateFilter', required=False, help='Only returns assessments that have been modified since the date passed in. Eg: 2006-01-02T15:04:05.000000000-07:00', type=str)
+    args = parser.parse_args()
+
     api_key: str = input('Enter your Api Key:\n').strip()
     api_client = OstrichApi(api_key=api_key)
 
@@ -20,7 +25,7 @@ def main():
     mapped_business_units: Dict[str, BusinessUnit] = {bu['businessUnitId']: bu for bu in flat_business_units}
 
     print('Retrieving Assessments...')
-    flat_assessments: List[Assessment] = get_all_assessments(api_client, flat_business_units)
+    flat_assessments: List[Assessment] = get_all_assessments(api_client, flat_business_units, after=args.dateFilter)
 
     print('Retrieving Scores and beginning report...')
     csv_rows: List[dict] = []
